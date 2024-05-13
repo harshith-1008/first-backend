@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import connectDB from "./db/index.js";
 import { app } from "./apps.js";
 dotenv.config({
-  path: "./env",
+  path: "./.env",
 });
 connectDB()
   .then(() => {
