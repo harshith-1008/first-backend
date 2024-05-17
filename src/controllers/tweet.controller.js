@@ -36,15 +36,15 @@ const createTweet = asyncHandler(async (req, res) => {
 });
 
 const getUserTweets = asyncHandler(async (req, res) => {
-  const { username } = req.params;
-  if (!username) {
+  const { userId } = req.params;
+  if (!userId) {
     throw new ApiError(400, "user is not valid");
   }
-  const userExist = await User.findOne({ username: username.toLowerCase() });
+  const userExist = await User.findById(userId);
   if (!userExist) {
     throw new ApiError(400, "user does not exist");
   }
-  const alltweets = await Tweet.find({ owner: userExist._id }).populate(
+  const alltweets = await Tweet.find({ owner: userId }).populate(
     "owner",
     "username"
   ); //for frontend guy we dont make any changes in the actual database
