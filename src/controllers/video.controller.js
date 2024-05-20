@@ -7,7 +7,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadOnCloduinary } from "../utils/cloudinary.js";
 
 const getAllVideos = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
+  const { page = 1, limit = 10, query, sortBy, sortType } = req.query;
+  const userId = req.user?._id;
   if (!userId || !isValidObjectId(userId)) {
     throw new ApiError(400, "user id should be valid");
   }
@@ -34,23 +35,27 @@ const getAllVideos = asyncHandler(async (req, res) => {
 
 const publishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
+  console.log(title, description);
   const thumbnailLocalPath = req.files?.thumbnail[0]?.path;
-  const videoLocalPath = req.files?.video[0]?.path;
+  const videoLocalPath = req.files?.videoFile[0]?.path;
   const user = req.user?._id;
-
+  console.log(thumbnailLocalPath);
+  console.log(videoLocalPath);
+  console.log(user);
+  console.log(isValidObjectId(user));
   if (
     !title ||
     !description ||
     !thumbnailLocalPath ||
     !videoLocalPath ||
     !user ||
-    isValidObjectId(user)
+    !isValidObjectId(user)
   ) {
     throw new ApiError(400, "all fields are requierd");
   }
 
-  const thumbnail = uploadOnCloduinary(thumbnailLocalPath);
-  const video = uploadOnCloduinary(videoLocalPath);
+  const thumbnail = await uploadOnCloduinary(thumbnailLocalPath);
+  const video = await uploadOnCloduinary(videoLocalPath);
 
   if (!thumbnail || !video) {
     throw new ApiError(500, "error occured while uploading to cloudinary");
@@ -59,10 +64,10 @@ const publishAVideo = asyncHandler(async (req, res) => {
   const uploadedVideo = await Video.create({
     title,
     description,
-    videoFile: video,
-    thumbnail,
+    videoFile: video.url,
+    thumbnail: thumbnail.url,
     owner: user,
-    duration: 10,
+    duration: video.duration,
   });
 
   if (!uploadedVideo) {
@@ -94,7 +99,7 @@ const getVideoById = asyncHandler(async (req, res) => {
 const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   const { title, description } = req.body;
-
+  console.log(title, description);
   if (!videoId || !isValidObjectId(videoId)) {
     throw new ApiError(400, "invalid video id");
   }
@@ -160,9 +165,9 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
   if (!videoIsPresent) {
     throw new ApiError(400, "video is not present");
   }
-
+  let isPublished = !videoIsPresent.isPublished;
   const toggle = await Video.findByIdAndUpdate(videoIsPresent._id, {
-    isPublished: !isPublished,
+    isPublished: isPublished,
   });
 
   if (!toggle) {

@@ -1,5 +1,5 @@
-import asyncHandler from "../utils/asyncHandler.js";
-import ApiError from "../utils/ApiError.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloduinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -41,9 +41,22 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "username or email not available");
   }
 
-  const avatarLocalPath = req.files?.avatar[0]?.path;
-  //   const coverimageLocalPath = req.files?.coverimage[0]?.path;
-  let coverimageLocalPath;
+  let avatarLocalPath, coverimageLocalPath;
+
+  if (
+    req.files &&
+    req.files.avatar &&
+    Array.isArray(req.files.avatar) &&
+    req.files.avatar.length > 0
+  ) {
+    avatarLocalPath = req.files.avatar[0].path;
+  } else {
+    throw new ApiError(400, "Avatar file is required");
+  }
+
+  // const avatarLocalPath = req.files?.avatar[0]?.path;
+
+  // let coverimageLocalPath;
   if (
     req.files &&
     Array.isArray(req.files.coverimage) &&
@@ -58,7 +71,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const avatar = await uploadOnCloduinary(avatarLocalPath);
   const coverimage = await uploadOnCloduinary(coverimageLocalPath);
-
+  console.log(avatar);
   if (!avatar) {
     throw new ApiError(400, "avatar file is required");
   }
@@ -87,7 +100,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
 const loginUser = asyncHandler(async (req, res) => {
   const { email, username, password } = req.body;
-  console.log(email);
+
   if (!email && !username) {
     throw new ApiError(400, "email or username must be given");
   }
@@ -160,7 +173,8 @@ const loggoutUser = asyncHandler(async (req, res) => {
 });
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
-  const incomingRefreshToken = req.cokies.refreshToken || req.body.refreshToken;
+  const incomingRefreshToken =
+    req.cookies.refreshToken || req.body.refreshToken;
   if (!incomingRefreshToken) {
     throw new ApiError(401, "unauthorized request");
   }
@@ -225,30 +239,33 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 const getCurrentUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
-    .json(200, req.user, "current user fetched succesfully");
+    .json(new ApiResponse(200, req.user, "current user fetched succesfully"));
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
   const { fullname, email } = req.body;
 
-  if (!fullname || !email) {
-    throw new ApiError(400, "all fields are empty");
+  if (!fullname && !email) {
+    throw new ApiError(400, "At least one of fullname or email is required");
   }
 
-  const user = User.findByIdAndUpdate(
+  const updateFields = {};
+  if (fullname) updateFields.fullname = fullname;
+  if (email) updateFields.email = email;
+
+  const user = await User.findByIdAndUpdate(
     req.user?._id,
-    {
-      $set: {
-        fullname,
-        email,
-      },
-    },
+    { $set: updateFields },
     { new: true }
   ).select("-password");
 
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
   return res
     .status(200)
-    .json(new ApiResponse(200, user, "account details update succesfulyy"));
+    .json(new ApiResponse(200, user, "Account details updated successfully"));
 });
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
@@ -312,6 +329,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
   if (!username?.trim()) {
     throw new ApiError(400, "username is missing");
   }
+
   const channel = await User.aggregate([
     {
       $match: {
